@@ -19,10 +19,11 @@ import requests
 import subprocess
 from tqdm import tqdm
 from six.moves import urllib
+import tarfile
 
 parser = argparse.ArgumentParser(description='Download dataset for DCGAN.')
-parser.add_argument('datasets', metavar='N', type=str, nargs='+', choices=['celebA', 'lsun', 'mnist'],
-           help='name of dataset to download [celebA, lsun, mnist]')
+parser.add_argument('datasets', metavar='N', type=str, nargs='+', choices=['celebA', 'lsun', 'mnist','cifar10','fashion-mnist'],
+           help='name of dataset to download [celebA, lsun, mnist, cifar10, fashion-mnist]')
 
 def download(url, dirpath):
   filename = url.split('/')[-1]
@@ -164,6 +165,47 @@ def download_mnist(dirpath):
     print('Decompressing ', file_name)
     subprocess.call(cmd)
 
+def download_fashion_mnist(dirpath):
+  data_dir = os.path.join(dirpath, 'fashion-mnist')
+  if os.path.exists(data_dir):
+    print('Found FASHION-MNIST - skip')
+    return
+  else:
+    os.mkdir(data_dir)
+  url_base = 'https://github.com/zalandoresearch/fashion-mnist'
+  file_names = ['train-images-idx3-ubyte.gz',
+                'train-labels-idx1-ubyte.gz',
+                't10k-images-idx3-ubyte.gz',
+                't10k-labels-idx1-ubyte.gz']
+  for file_name in file_names:
+    url = (url_base+file_name).format(**locals())
+    print(url)
+    out_path = os.path.join(data_dir,file_name)
+    cmd = ['curl', url, '-o', out_path]
+    print('Downloading ', file_name)
+    subprocess.call(cmd)
+    cmd = ['gzip', '-d', out_path]
+    print('Decompressing ', file_name)
+    subprocess.call(cmd)
+
+def download_cifar10(dirpath):
+  url_base = 'https://www.cs.toronto.edu/~kriz/'
+  file_names = ['cifar-10-python.tar.gz']
+  for file_name in file_names:
+    url = (url_base+file_name).format(**locals())
+    print(url)
+    out_path = os.path.join(dirpath,file_name)
+    cmd = ['curl', url, '-o', out_path]
+    print('Downloading ', file_name)
+    subprocess.call(cmd)
+    print('Decompressing ', file_name)
+    tar = tarfile.open(out_path)
+    tar.extractall(path=dirpath)
+    tar.close()
+    os.rename(os.path.join(dirpath,'cifar-10-batches-py'), os.path.join(dirpath,'cifar10'))
+    os.remove(out_path)
+
+
 def prepare_data_dir(path = './data'):
   if not os.path.exists(path):
     os.mkdir(path)
@@ -178,3 +220,7 @@ if __name__ == '__main__':
     download_lsun('./data')
   if 'mnist' in args.datasets:
     download_mnist('./data')
+  if 'cifar10' in args.datasets:
+    download_cifar10('./data')
+  if 'fashion-mnist' in args.datasets:
+    download_fashion_mnist('./data')
