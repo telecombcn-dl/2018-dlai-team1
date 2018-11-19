@@ -8,7 +8,6 @@ import numpy as np
 
 
 def image2tensor():
-
     images_list = []
     for filename in os.listdir(os.path.join(os.getcwd(), "../fotos")):
         if filename.endswith(".jpg"):
@@ -23,10 +22,17 @@ def image2tensor():
     print("batch of images: ",images_batch)
     return images_batch
 
+def compute_p(t, t_st, t_r=5e3):
+    # t: current iteration index
+    # t_st: last augmentation iteration
+    # t_r: hyperparameter
+    return min(.5*(t-t_st)/t_r, .5)
 
-def create_random_vector(images):
+def create_random_vector(images, p=.5):
     size = images.get_shape()[0]
-    random_vector = np.random.randint(2, size=size)
+    #  Bernoulli probability p of 1 and (1-p) of 0
+    random_vector = np.where(np.random.random(size) < p, np.ones(size), np.zeros(size)).astype(np.uint8)
+
     print("random vector: ", random_vector)
     return random_vector
 
