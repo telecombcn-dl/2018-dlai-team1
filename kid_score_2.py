@@ -39,6 +39,6 @@ def kid_score(X, Y):
 def KID(images_gen, images_real):
     # TODO check outputs format. Images should be between -1 and 1
     # (we can use preprocess input to go from [0, 255] to [-1, 1])
-    preds_gen = inception(images_gen)
-    preds_real = inception(images_gen)
+    preds_gen = inception.predict(images_gen)
+    preds_real = inception.predict(images_gen)
     return kid_score(preds_gen, preds_real)
