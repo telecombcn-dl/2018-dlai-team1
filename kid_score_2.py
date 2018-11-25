@@ -34,7 +34,7 @@ def kid_score(X, Y):
         
         return res
 
-    return 1/(n*(n-1))*f(X, X) + 1/(m*(m-1))*f(Y, Y) + 2/(n*m)*f2(X, Y)
+    return 1/(n*(n-1))*f(X, X) + 1/(m*(m-1))*f(Y, Y) - 2/(n*m)*f2(X, Y)
 
 def KID(images_gen, images_real):
     # TODO check outputs format. Images should be between -1 and 1
