@@ -195,6 +195,7 @@ class DCGAN(object):
     else:
       print(" [!] Load failed...")
 
+    # update_ops = tf.get_collection(SPECTRAL_NORM_UPDATE_OPS) according to Spectral Normalization
     for epoch in xrange(config.epoch):
       if config.dataset == 'mnist':
         batch_idxs = min(len(self.data_X), config.train_size) // config.batch_size
@@ -225,6 +226,13 @@ class DCGAN(object):
 
         batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
+
+        # CREC QUE ES AQUI ON HAURIEM DE COMPROVAR SI INCREMENTAR S O NO #
+        # 1. Mirar si ja han passat t iteracions
+        # 2. Agafar 10k samples del training set
+        # 3 generar 10k samples: (si ens fixem en la comanda de UPDATE G NETWORK, modificar batch_z i canviar el _ per guardar les imatges)
+        # calcular la KID
+        # si no s'ha reduit mes d'un 5%, afegir una dimensio a s i canviar el self.inputs: batch_images
 
         if config.dataset == 'mnist':
           # Update D network
@@ -316,6 +324,9 @@ class DCGAN(object):
 
         if np.mod(counter, 500) == 2:
           self.save(config.checkpoint_dir, counter)
+
+      # for update_op in update_ops:  according to Spectral Normalization
+      #     sess.run(update_op)
 
   def discriminator(self, image, y=None, reuse=False):
     with tf.variable_scope("discriminator") as scope:
