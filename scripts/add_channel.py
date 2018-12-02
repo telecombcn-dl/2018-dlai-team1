@@ -29,18 +29,18 @@ def compute_p(t, t_st, t_r=5e3):
     return min(.5*(t-t_st)/t_r, .5)
 
 def create_random_vector(images, p=.5):
-    size = images.get_shape()[0]
+    size = images.shape[0]
     # Bernoulli probability p of 1 and (1-p) of 0
     random_vector = np.where(np.random.random(size) < p, np.ones(size), np.zeros(size)).astype(np.uint8)
 
     print("random vector: ", random_vector)
     return random_vector
 
-def add_channel(images_batch, labels_batch, p=.5):
-    print("Labels:\n", labels_batch)
+def add_channel(images_batch, p=.5):
+    #print("Labels:\n", labels_batch)
 
     random_vector = create_random_vector(images_batch, p=p)
-    new_labels = np.logical_xor(labels_batch, random_vector).astype(np.int)
+    #new_labels = np.logical_xor(labels_batch, random_vector).astype(np.int)
     new_channels = np.array(random_vector) * np.array(tf.ones([28, 28, 1], tf.uint8))
 
     #Així com per crear el vector és fàcil  passar-li el batch size i que te'l crei del tamany que toqui,
@@ -52,11 +52,12 @@ def add_channel(images_batch, labels_batch, p=.5):
 
     new_batch = tf.concat([images_batch, new_channels], 3)
     print("original image with new channel added shape: ", new_batch.get_shape())
-    print("New labels:\n", new_labels)
+    #print("New labels:\n", new_labels)
 
-    return new_batch, new_labels
+    return new_batch
 
 
 if __name__ == '__main__':
     images_batch = image2tensor()
-    returned_images = add_channel(images_batch, np.random.randint(2, size=5))
+    returned_images = add_channel(images_batch)
+    #np.random.randint(2, size=5)
