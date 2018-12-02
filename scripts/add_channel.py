@@ -30,16 +30,16 @@ def compute_p(t, t_st, t_r=5e3):
 
 def create_random_vector(images, p=.5):
     size = images.get_shape()[0]
-    #  Bernoulli probability p of 1 and (1-p) of 0
+    # Bernoulli probability p of 1 and (1-p) of 0
     random_vector = np.where(np.random.random(size) < p, np.ones(size), np.zeros(size)).astype(np.uint8)
 
     print("random vector: ", random_vector)
     return random_vector
 
-def add_channel(images_batch, labels_batch):
+def add_channel(images_batch, labels_batch, p=.5):
     print("Labels:\n", labels_batch)
 
-    random_vector = create_random_vector(images_batch)
+    random_vector = create_random_vector(images_batch, p=p)
     new_labels = np.logical_xor(labels_batch, random_vector).astype(np.int)
     new_channels = np.array(random_vector) * np.array(tf.ones([28, 28, 1], tf.uint8))
 

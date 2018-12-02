@@ -93,6 +93,8 @@ class DCGAN(object):
 
     self.build_model()
 
+    self.augmentation_level = 0
+
   def build_model(self):
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
@@ -173,6 +175,7 @@ class DCGAN(object):
       sample_labels = self.data_y[0:self.sample_num]
     else:
       sample_files = self.data[0:self.sample_num]
+      # TODO: add_channel here
       sample = [
           get_image(sample_file,
                     input_height=self.input_height,
@@ -233,6 +236,43 @@ class DCGAN(object):
         # 3 generar 10k samples: (si ens fixem en la comanda de UPDATE G NETWORK, modificar batch_z i canviar el _ per guardar les imatges)
         # calcular la KID
         # si no s'ha reduit mes d'un 5%, afegir una dimensio a s i canviar el self.inputs: batch_images
+        t = 1e4
+        if idx % t == 2:
+          # print(self.data_X.shape)
+          # real_images = np.random.choice(self.data_X, size=10000, replace=False)
+          # real_images = self.data_X[:10000]
+          
+          # Generated images in batches of 64 (total ~10000)
+          gen_images_list = []
+          for i in range(156):
+            sample_z = np.random.uniform(-1, 1, size=(64, self.z_dim))
+            gen_images_list.append(self.sess.run(self.G, feed_dict={self.z: sample_z}))
+          gen_images = np.stack(gen_images_list, axis=0)
+
+          # Real images (total ~10000)
+          # TODO: Use random real images
+          sample_files = self.data[:156*64]
+          sample = [
+          get_image(sample_file,
+                    input_height=self.input_height,
+                    input_width=self.input_width,
+                    resize_height=self.output_height,
+                    resize_width=self.output_width,
+                    crop=self.crop,
+                    grayscale=self.grayscale) for sample_file in sample_files]
+          real_images = np.stack(sample, axis=0)
+
+
+          from kid_score_2 import KID
+          kid_score = KID(real_images, gen_images)
+          print(kid_score)
+          last_kid_score_2 = last_kid_score
+          last_kid_score = kid_score
+
+          if kid_score <= .95*.5*(last_kid_score+last_kid_score_2):
+            # TODO increase augmentation_level
+            self.augmentation_level += 1
+
 
         if config.dataset == 'mnist':
           # Update D network
@@ -334,7 +374,7 @@ class DCGAN(object):
         scope.reuse_variables()
 
       if not self.y_dim:
-        h0 = lrelu(conv2d(image, self.df_dim, name='d_h0_conv'))
+        h0 = lrelu(conv2d(image, self.df_dim, name='d_h0_conv', increments=self.augmentation_level))
         h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, name='d_h1_conv')))
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, name='d_h2_conv')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, name='d_h3_conv')))

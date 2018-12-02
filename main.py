@@ -55,7 +55,7 @@ def main(_):
           output_height=FLAGS.output_height,
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.batch_size,
-          y_dim=10,
+          # y_dim=10,
           z_dim=FLAGS.generate_test_images,
           dataset_name=FLAGS.dataset,
           input_fname_pattern=FLAGS.input_fname_pattern,
