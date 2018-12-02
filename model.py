@@ -9,6 +9,7 @@ from six.moves import xrange
 
 from ops import *
 from utils import *
+from scripts import add_channel
 
 def conv_out_size_same(size, stride):
   return int(math.ceil(float(size) / float(stride)))
@@ -90,10 +91,8 @@ class DCGAN(object):
         raise Exception("[!] Entire dataset size is less than the configured batch_size")
     
     self.grayscale = (self.c_dim == 1)
-
-    self.build_model()
-
     self.augmentation_level = 0
+    self.build_model()
 
   def build_model(self):
     if self.y_dim:
@@ -188,7 +187,12 @@ class DCGAN(object):
         sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
       else:
         sample_inputs = np.array(sample).astype(np.float32)
-  
+
+      #I think it has to be done here, as in line where TO DO is specified we just have the image names not the images.
+      self.augmentation_level = 2 #just to test
+      for s in xrange(self.augmentation_level):
+        sample_inputs = add_channel.add_channel(sample_inputs)
+
     counter = 1
     start_time = time.time()
     could_load, checkpoint_counter = self.load(self.checkpoint_dir)
