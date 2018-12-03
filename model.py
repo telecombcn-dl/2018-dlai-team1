@@ -94,6 +94,13 @@ class DCGAN(object):
     self.augmentation_level = 0
     self.build_model()
 
+  def add_channels(self, images, batch_s, generated=True)
+    if not batch_s:  # Aixo mira si esta buit
+      labels = tf.ones(size=[self.batch_size]) if generated else tf.zeros(size=[self.batch_size])
+      return images, labels
+    else:
+      return augmented_images, labels  # I think you should use tf.tile
+
   def build_model(self):
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
@@ -107,6 +114,7 @@ class DCGAN(object):
 
     self.inputs = tf.placeholder(
       tf.float32, [self.batch_size] + image_dims, name='real_images')
+    self.batch_s = tf.placeholder(tf.int64, [self.batch_size, None], name='batch_s')
 
     inputs = self.inputs
 
@@ -114,10 +122,12 @@ class DCGAN(object):
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
 
-    self.G                  = self.generator(self.z, self.y)
-    self.D, self.D_logits   = self.discriminator(inputs, self.y, reuse=False)
-    self.sampler            = self.sampler(self.z, self.y)
-    self.D_, self.D_logits_ = self.discriminator(self.G, self.y, reuse=True)
+    self.G = self.generator(self.z, self.y)
+    self.augmented_G, self.G_labels = self.add_channels(self.G, self.batch_s, generated=True)
+    self.augmented_inputs, self.input_labels = self.add_channels(self.inputs, self.batch_s, generated=False)
+    self.D, self.D_logits = self.discriminator(self.augmented_inputs, self.y, reuse=False)
+    self.sampler = self.sampler(self.z, self.y)
+    self.D_, self.D_logits_ = self.discriminator(self.augmented_G, self.y, reuse=True)
     
     self.d_sum = histogram_summary("d", self.D)
     self.d__sum = histogram_summary("d_", self.D_)
@@ -130,9 +140,9 @@ class DCGAN(object):
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
 
     self.d_loss_real = tf.reduce_mean(
-      sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
+      sigmoid_cross_entropy_with_logits(self.D_logits, self.input_labels))
     self.d_loss_fake = tf.reduce_mean(
-      sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
+      sigmoid_cross_entropy_with_logits(self.D_logits_, self.G_labels))
     self.g_loss = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
 
@@ -231,8 +241,6 @@ class DCGAN(object):
           else:
             batch_images = np.array(batch).astype(np.float32)
 
-        batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
-              .astype(np.float32)
 
         # CREC QUE ES AQUI ON HAURIEM DE COMPROVAR SI INCREMENTAR S O NO #
         # 1. Mirar si ja han passat t iteracions
@@ -277,6 +285,9 @@ class DCGAN(object):
             # TODO increase augmentation_level
             self.augmentation_level += 1
 
+        batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]).astype(np.float32)
+
+        batch_s = np.random.randint(0, 1, size=(config.batch_size, self.augmentation_level)) # TODO think about last p
 
         if config.dataset == 'mnist':
           # Update D network
