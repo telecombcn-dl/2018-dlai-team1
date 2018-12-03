@@ -17,7 +17,7 @@ markdown: kramdown
 title:       "PAGANS"
 keywords:    "deep learning, recurrent neural networks, rnn"
 description: "Description here"
-source_link: "https://github.com//telecombcn-dl/2018-dlai-team1/"
+source_link: "https://github.com/telecombcn-dl/2018-dlai-team1/"
 favicon:     "img/favicon.ico"
 touch_icon:  "img/apple-touch-icon.png"
 # google_analytics_key: UA-49607422-1 ## put YOUR key here to enable tracking! (blank to disable)
