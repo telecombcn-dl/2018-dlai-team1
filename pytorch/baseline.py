@@ -17,6 +17,7 @@ from collections import OrderedDict
 import torch.nn.functional as F
 
 from utils import compute_fid
+from tqdm import tqdm
 
 # class Generator(nn.Module):
 #     def __init__(self, ngpu, nc, nz, ngf):
@@ -279,18 +280,17 @@ def main(opt):
         print("Epoch: {}. Computing FID...".format(epoch))
         samples = random.sample(range(len(dataset)), opt.fid_batch)
         real_fid = [dataset[s][0] for s in samples]
-        real_fid = torch.stack(real_fid, dim=0)
+        real_fid = torch.stack(real_fid, dim=0).to(device)
         fake_fid = []
         with torch.no_grad():
             z = torch.randn(opt.fid_batch, nz, device=device)
-            for k in range(opt.fid_batch // opt.batch_size):
+            for k in tqdm(range(opt.fid_batch // opt.batch_size), desc="Generating fake images"):
                 z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
                 fake_fid.append(netG(z_))
-            fake_fid = torch.cat(fake_fid, dim=0)
+            fake_fid = torch.cat(fake_fid, dim=0).to(device)
         fid = compute_fid(real_fid, fake_fid)
         print("FID: {:.4f}".format(fid))
 
-        fid_score_history.append(fid)
         writer.add_scalar("fid", fid, global_step)
 
         for i, data in enumerate(dataloader, start=0):
@@ -432,10 +432,10 @@ if __name__ == "__main__":
         "--outc", default="./checkpoints/", help="folder to output model checkpoints"
     )
     parser.add_argument(
-        "--fid-batch", default=9984, help="how many images to use to compute fid"
+        "--fid-batch", default=9984, type=int, help="how many images to use to compute fid"
     )
-    parser.add_argument("--log-interval", default=25, help="log interval")
-    parser.add_argument("--save-interval", default=100, help="save interval")
+    parser.add_argument("--log-interval", default=25, type=int, help="log interval")
+    parser.add_argument("--save-interval", default=100, type=int, help="save interval")
     parser.add_argument("--manualSeed", type=int, help="manual seed")
 
     opt = parser.parse_args()

@@ -5,6 +5,8 @@ import numpy as np
 from inception import InceptionV3
 from torch.utils.data import TensorDataset, DataLoader
 from torch.nn.functional import adaptive_avg_pool2d
+from tqdm import tqdm
+from scipy import linalg
 
 model = InceptionV3()
 model.eval()
@@ -21,7 +23,7 @@ def add_channel(images, augmentation_bits, real):
         raise NotImplementedError
 
 
-def compute_kid(real, fake, batch_size=64):
+def compute_kid(real, fake, batch_size=128):
     model.to(real.device)
     print("Computing Inception Activations")
     real_activations = get_activations(real, model, batch_size)
@@ -30,19 +32,19 @@ def compute_kid(real, fake, batch_size=64):
     return _kid(real_activations, fake_activations)
 
 
-def compute_fid(real, fake, batch_size=64):
+def compute_fid(real, fake, batch_size=128):
     model.to(real.device)
     real_activations = get_activations(real, model, batch_size)
-    real_mu = np.mean(real_activations)
-    real_sigma = np.cov(real_activations)
+    real_mu = np.mean(real_activations, axis=0)
+    real_sigma = np.cov(real_activations, rowvar=False)
 
     fake_activations = get_activations(fake, model, batch_size)
-    fake_mu = np.mean(fake_activations)
-    fake_sigma = np.cov(fake_activations)
+    fake_mu = np.mean(fake_activations, axis=0)
+    fake_sigma = np.cov(fake_activations, rowvar=False)
     return _fid(real_mu, real_sigma, fake_mu, fake_sigma)
 
 
-def get_activations(images, model, batch_size=64, dims=2048):
+def get_activations(images, model, batch_size=128, dims=2048):
     """Calculates the activations of the pool_3 layer for all images.
     Params:
     -- images      : Numpy array of dimension (n_images, 3, hi, wi). The values
@@ -61,7 +63,7 @@ def get_activations(images, model, batch_size=64, dims=2048):
     loader = DataLoader(images, batch_size=batch_size)
     preds = []
     with torch.no_grad():
-        for batch in loader:
+        for batch in tqdm(loader, desc="Computing inception activations"):
             pred = model(batch)[0]
             # If model output is not scalar, apply global spatial average pooling.
             # This happens if you choose a dimensionality not equal 2048.
@@ -69,8 +71,8 @@ def get_activations(images, model, batch_size=64, dims=2048):
                 pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
             
             preds.append(pred)
-        preds = torch.cat(preds, dim=0).cpu().detach().numpy()
-        return preds
+        preds = torch.cat(preds, dim=0).squeeze().cpu().detach().numpy()
+    return preds
 
 def _kid(X, Y):
     """

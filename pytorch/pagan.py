@@ -197,7 +197,7 @@ def main(opt):
 
     criterion = nn.BCELoss()
 
-    fixed_noise = torch.randn(opt.batch_size, nz, device=device)
+    fixed_noise = torch.randn(opt.batch_size, nz, device=device) # TODO should be uniform
 
     # setup optimizer
     optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -205,8 +205,8 @@ def main(opt):
 
     global_step = 0
     augmentation_level = 0
+    last_augmentation_step = 0
     kid_score_history = []
-    fid_score_history = []
 
     for epoch in range(opt.epochs):
 
@@ -224,7 +224,6 @@ def main(opt):
         fid = compute_fid(real_fid, fake_fid)
         print("FID: {:.4f}".format(fid))
 
-        fid_score_history.append(fid)
         writer.add_scalar("fid", fid, global_step)
 
         for i, data in enumerate(dataloader, start=0):
@@ -238,9 +237,14 @@ def main(opt):
             batch_size = real.size(0)
 
             if augmentation_level > 0:
-                augmentation_bits = torch.randint(
-                    0, 2, size=(batch_size, augmentation_level)
-                )
+                if augmentation level > 1:
+                    augmentation_bits_old = torch.randint(0, 2, size=(batch_size, augmentation_level-1))
+                    p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
+                    augmentation_bits_new = torch.where(torch.rand(batch_size) < p, torch.ones((batch_size,)), torch.zeros((batch_size,)))
+                    augmentation_bits = torch.concat([augmentation_bits_old, augmentation_bits_new], dim=1)
+                else:
+                    p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
+                    augmentation_bits = torch.where(torch.rand(batch_size) < p, torch.ones((batch_size,)), torch.zeros((batch_size,)))
             else:
                 augmentation_bits = None
 
@@ -337,11 +341,13 @@ def main(opt):
                 print("KID: {:.4f}".format(kid))
                 if (
                     len(kid_score_history) >= 2
-                    and kid >= (kid_score_history[-1] + kid_score_history[-2]) / 40
-                ):  # KID bigger than 5% of the average of the 2 previous ones
+                    and kid <= (kid_score_history[-1] + kid_score_history[-2]) / 40
+                ):  # KID smaller than 5% of the average of the 2 previous ones
                     augmentation_level += 1
+                    last_augmentation_step = global_step
                     netD.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False))
                     print("Augmentation level increased to {}".format(augmentation_level))
+                    kid_score_history = []
 
                 kid_score_history.append(kid)
                 writer.add_scalar("kid", kid, global_step)
@@ -394,6 +400,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--beta1", type=float, default=0.5, help="beta1 for adam. default=0.5"
     )
+    parser.add_argument(
+        "--tr", type=int, default=5000, help="steps for p to reach 0.5"
+    )
     parser.add_argument("--cuda", action="store_true", help="enables cuda")
     parser.add_argument("--ngpu", type=int, default=1, help="number of GPUs to use")
     parser.add_argument(
@@ -408,17 +417,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--outc", default="./checkpoints/", help="folder to output model checkpoints"
     )
-    parser.add_argument("--log-interval", default=25, help="log interval")
+    parser.add_argument("--log-interval", default=25, type=int, help="log interval")
     parser.add_argument(
         "--augmentation-interval", default=10000, help="augmentation interval"
     )
     parser.add_argument(
-        "--kid-batch", default=9984, help="how many images to use to compute kid"
+        "--kid-batch", default=9984, type=int, help="how many images to use to compute kid"
     )
     parser.add_argument(
-        "--fid-batch", default=9984, help="how many images to use to compute fid"
+        "--fid-batch", default=9984, type=int, help="how many images to use to compute fid"
     )
-    parser.add_argument("--save-interval", default=100, help="save interval")
+    parser.add_argument("--save-interval", default=100, type=int, help="save interval")
     parser.add_argument("--manualSeed", type=int, help="manual seed")
 
     opt = parser.parse_args()
