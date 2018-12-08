@@ -11,40 +11,115 @@ import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
+from torch.nn.utils import spectral_norm
+from tensorboardX import SummaryWriter
+from collections import OrderedDict
+import torch.nn.functional as F
+
+from utils import compute_fid
+
+# class Generator(nn.Module):
+#     def __init__(self, ngpu, nc, nz, ngf):
+#         super(Generator, self).__init__()
+#         self.ngpu = ngpu
+#         self.main = nn.Sequential(
+#             # input is Z, going into a convolution
+#             nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
+#             nn.BatchNorm2d(ngf * 8),
+#             nn.ReLU(True),
+#             # state size. (ngf*8) x 4 x 4
+#             nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf * 4),
+#             nn.ReLU(True),
+#             # state size. (ngf*4) x 8 x 8
+#             nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf * 2),
+#             nn.ReLU(True),
+#             # state size. (ngf*2) x 16 x 16
+#             nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf),
+#             nn.ReLU(True),
+#             # state size. (ngf) x 32 x 32
+#             nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
+#             nn.Tanh()
+#             # state size. (nc) x 64 x 64
+#         )
+
+#     def forward(self, input):
+#         if input.is_cuda and self.ngpu > 1:
+#             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+#         else:
+#             output = self.main(input)
+#         return output
+
+
+# class Discriminator(nn.Module):
+#     def __init__(self, ngpu, nc, ndf):
+#         super(Discriminator, self).__init__()
+#         self.ngpu = ngpu
+#         self.main = nn.Sequential(
+#             # input is (nc) x 64 x 64
+#             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+#             nn.LeakyReLU(0.2, inplace=True),
+#             # state size. (ndf) x 32 x 32
+#             nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ndf * 2),
+#             nn.LeakyReLU(0.2, inplace=True),
+#             # state size. (ndf*2) x 16 x 16
+#             nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ndf * 4),
+#             nn.LeakyReLU(0.2, inplace=True),
+#             # state size. (ndf*4) x 8 x 8
+#             nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ndf * 8),
+#             nn.LeakyReLU(0.2, inplace=True),
+#             # state size. (ndf*8) x 4 x 4
+#             nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+#             nn.Sigmoid(),
+#         )
+
+#     def forward(self, input):
+#         if input.is_cuda and self.ngpu > 1:
+#             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+#         else:
+#             output = self.main(input)
+
+#         return output.view(-1, 1).squeeze(1)
 
 
 class Generator(nn.Module):
     def __init__(self, ngpu, nc, nz, ngf):
         super(Generator, self).__init__()
         self.ngpu = ngpu
+        self.ngf = ngf
+        self.fc = nn.Linear(nz, 8*8*ngf*8)
         self.main = nn.Sequential(
-            # input is Z, going into a convolution
-            nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
-            # state size. (ngf*8) x 4 x 4
+            # state size. (ngf*8) x 8 x 8
             nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
             nn.ReLU(True),
-            # state size. (ngf*4) x 8 x 8
+            # state size. (ngf*4) x 16 x 16
             nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
-            # state size. (ngf*2) x 16 x 16
+            # state size. (ngf*2) x 32 x 32
             nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            # state size. (ngf) x 32 x 32
-            nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
+            # state size. (ngf) x 64 x 64
+            nn.ConvTranspose2d(ngf, nc, 3, 1, 1, bias=False),
             nn.Tanh()
             # state size. (nc) x 64 x 64
         )
 
     def forward(self, input):
         if input.is_cuda and self.ngpu > 1:
+            raise NotImplementedError
             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
-            output = self.main(input)
+            x = F.relu(self.fc(input))
+            x = x.view(-1, self.ngf*8, 8, 8)
+            output = self.main(x)
         return output
 
 
@@ -52,34 +127,47 @@ class Discriminator(nn.Module):
     def __init__(self, ngpu, nc, ndf):
         super(Discriminator, self).__init__()
         self.ngpu = ngpu
+        self.ndf = ndf
         self.main = nn.Sequential(
-            # input is (nc) x 64 x 64
-            nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf) x 32 x 32
-            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 2),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*2) x 16 x 16
-            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*4) x 8 x 8
-            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 8),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*8) x 4 x 4
-            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid(),
+            OrderedDict(
+                [
+                    # input is (nc) x 64 x 64
+                    ("conv1", spectral_norm(nn.Conv2d(nc, ndf, 3, 1, 1, bias=False))),
+                    ("lrelu1", nn.LeakyReLU(0.2, inplace=True)),
+                    # state size. (ndf) x 64 x 64
+                    ("conv2", spectral_norm(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False))),
+                    ("lrelu2", nn.LeakyReLU(0.2, inplace=True)),
+                    # state size. (ndf*2) x 32 x 32
+                    ("conv3", spectral_norm(nn.Conv2d(ndf * 2, ndf * 2, 3, 1, 1, bias=False))),
+                    ("lrelu3", nn.LeakyReLU(0.2, inplace=True)),
+                    # state size. (ndf*2) x 32 x 32
+                    ("conv4", spectral_norm(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False))),
+                    ("lrelu4", nn.LeakyReLU(0.2, inplace=True)),
+                    # state size. (ndf*4) x 16 x 16
+                    ("conv5", spectral_norm(nn.Conv2d(ndf * 4, ndf * 4, 3, 1, 1, bias=False))),
+                    ("lrelu5", nn.LeakyReLU(0.2, inplace=True)),
+                    # state size. (ndf*4) x 16 x 16
+                    ("conv6", spectral_norm(nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False))),
+                    ("lrelu6", nn.LeakyReLU(0.2, inplace=True)),
+                    # state size. (ndf*8) x 8 x 8
+                    ("conv7", spectral_norm(nn.Conv2d(ndf * 8, ndf * 8, 3, 1, 1, bias=False))),
+                    ("lrelu7", nn.LeakyReLU(0.2, inplace=True)),
+                    # state size. (ndf*8) x 8 x 8
+                ]
+            )
         )
+        self.fc = nn.Linear((ndf*8) * 8 * 8, 1)
 
     def forward(self, input):
         if input.is_cuda and self.ngpu > 1:
+            raise NotImplementedError
             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
-            output = self.main(input)
+            x = self.main(input)
+            x = x.view(-1, (self.ndf*8) * 8 * 8)
+            output = torch.sigmoid(self.fc(x))
 
-        return output.view(-1, 1).squeeze(1)
+        return output.squeeze()
 
 
 # custom weights initialization called on netG and netD
@@ -93,6 +181,7 @@ def weights_init(m):
 
 
 def main(opt):
+    writer = SummaryWriter(log_dir="logs/baseline/{}".format(opt.dataset))
 
     if opt.dataset in ["imagenet", "folder", "lfw"]:
         # folder dataset
@@ -151,7 +240,7 @@ def main(opt):
         )
     assert dataset
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=opt.batchSize, shuffle=True, num_workers=int(opt.workers)
+        dataset, batch_size=opt.batch_size, shuffle=True, num_workers=int(opt.workers)
     )
 
     device = torch.device("cuda:0" if opt.cuda else "cpu")
@@ -175,7 +264,7 @@ def main(opt):
 
     criterion = nn.BCELoss()
 
-    fixed_noise = torch.randn(opt.batchSize, nz, 1, 1, device=device)
+    fixed_noise = torch.randn(opt.batch_size, nz, device=device)
     real_label = 1
     fake_label = 0
 
@@ -185,7 +274,25 @@ def main(opt):
 
     global_step = 0
 
-    for epoch in range(opt.niter):
+    for epoch in range(opt.epochs):
+
+        print("Epoch: {}. Computing FID...".format(epoch))
+        samples = random.sample(range(len(dataset)), opt.fid_batch)
+        real_fid = [dataset[s][0] for s in samples]
+        real_fid = torch.stack(real_fid, dim=0)
+        fake_fid = []
+        with torch.no_grad():
+            z = torch.randn(opt.fid_batch, nz, device=device)
+            for k in range(opt.fid_batch // opt.batch_size):
+                z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
+                fake_fid.append(netG(z_))
+            fake_fid = torch.cat(fake_fid, dim=0)
+        fid = compute_fid(real_fid, fake_fid)
+        print("FID: {:.4f}".format(fid))
+
+        fid_score_history.append(fid)
+        writer.add_scalar("fid", fid, global_step)
+
         for i, data in enumerate(dataloader, start=0):
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -202,7 +309,7 @@ def main(opt):
             D_x = output.mean().item()
 
             # train with fake
-            noise = torch.randn(batch_size, nz, 1, 1, device=device)
+            noise = torch.randn(batch_size, nz, device=device)
             fake = netG(noise)
             label.fill_(fake_label)
             output = netD(fake.detach())
@@ -223,13 +330,11 @@ def main(opt):
             D_G_z2 = output.mean().item()
             optimizerG.step()
 
-            global_step += 1
-
             if i % opt.log_interval == 0:
                 print(
                     "[{}/{}][{}/{}] Loss_D: {:.4f} Loss_G: {:.4f} D(x): {:.4f} D(G(z)): {:.4f} / {:.4f}".format(
                         epoch,
-                        opt.niter,
+                        opt.epochs,
                         i,
                         len(dataloader),
                         errD.item(),
@@ -239,7 +344,22 @@ def main(opt):
                         D_G_z2,
                     )
                 )
+                writer.add_scalar("discriminator/loss", errD.item(), global_step)
+                writer.add_scalar("generator/loss", errG.item(), global_step)
+                writer.add_scalar("discriminator/mean", D_x, global_step)
+                writer.add_scalar("generator/mean1", D_G_z1, global_step)
+                writer.add_scalar("generator/mean2", D_G_z2, global_step)
+
             if i % opt.save_interval == 0 or i == len(dataloader)-1:
+                if global_step == 0:
+                    x = vutils.make_grid(
+                        real_images, normalize=True
+                    )
+                    writer.add_image('Real images', x, global_step)
+                x = vutils.make_grid(
+                    fake, normalize=True
+                )
+                writer.add_image('Generated images', x, global_step)
                 vutils.save_image(
                     real_images, "%s/real_%s.png" % (opt.outi, opt.dataset), normalize=True
                 )
@@ -249,6 +369,8 @@ def main(opt):
                     "%s/fake_%s_epoch_%03d.png" % (opt.outi, opt.dataset, epoch),
                     normalize=True,
                 )
+            
+            global_step += 1
 
         # do checkpointing
         torch.save(
@@ -270,7 +392,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--workers", type=int, help="number of data loading workers", default=4
     )
-    parser.add_argument("--batchSize", type=int, default=64, help="input batch size")
+    parser.add_argument("--batch-size", type=int, default=64, help="input batch size")
     parser.add_argument(
         "--imageSize",
         type=int,
@@ -278,7 +400,7 @@ if __name__ == "__main__":
         help="the height / width of the input image to network",
     )
     parser.add_argument(
-        "--nz", type=int, default=100, help="size of the latent z vector"
+        "--nz", type=int, default=128, help="size of the latent z vector"
     )
     parser.add_argument(
         "--ngf", type=int, default=64, help="number of generator filters"
@@ -287,7 +409,7 @@ if __name__ == "__main__":
         "--ndf", type=int, default=64, help="number of discriminator filters"
     )
     parser.add_argument(
-        "--niter", type=int, default=25, help="number of epochs to train for"
+        "--epochs", type=int, default=25, help="number of epochs to train for"
     )
     parser.add_argument(
         "--lr", type=float, default=0.0002, help="learning rate, default=0.0002"
@@ -308,6 +430,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--outc", default="./checkpoints/", help="folder to output model checkpoints"
+    )
+    parser.add_argument(
+        "--fid-batch", default=9984, help="how many images to use to compute fid"
     )
     parser.add_argument("--log-interval", default=25, help="log interval")
     parser.add_argument("--save-interval", default=100, help="save interval")
