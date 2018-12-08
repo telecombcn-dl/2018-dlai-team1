@@ -184,39 +184,50 @@ def main(opt):
     optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
     global_step = 0
+    augmentation_level = 0
 
     for epoch in range(opt.niter):
         for i, data in enumerate(dataloader, start=0):
+
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
             ###########################
             # train with real
             netD.zero_grad()
-            real_images = data[0].to(device)
-            batch_size = real_images.size(0)
-            label = torch.full((batch_size,), real_label, device=device)
+            real = data[0].to(device)
+            batch_size = real.size(0)
 
-            output = netD(real_images)
-            errD_real = criterion(output, label)
+            if augmentation_level > 0:
+                augmentation_bits = torch.randint(0, 2, size=(batch_size, augmentation_level))
+            else:
+                augmentation_bits = None
+
+            real_augmented, labels_augmented = add_channel(real, augmentation_bits, real=True)
+            # label = torch.full((batch_size,), real_label, device=device)
+
+            output = netD(real_augmented)
+            errD_real = criterion(output, labels_augmented)
             errD_real.backward()
             D_x = output.mean().item()
 
             # train with fake
             noise = torch.randn(batch_size, nz, 1, 1, device=device)
             fake = netG(noise)
-            label.fill_(fake_label)
-            output = netD(fake.detach())
-            errD_fake = criterion(output, label)
+            fake_augmented, labels_augmented = add_channel(fake, augmentation_bits, real=False)
+            # label.fill_(fake_label)
+            output = netD(fake_augmented.detach())
+            errD_fake = criterion(output, labels_augmented)
             errD_fake.backward()
             D_G_z1 = output.mean().item()
             errD = errD_real + errD_fake
             optimizerD.step()
 
+
             ############################
             # (2) Update G network: maximize log(D(G(z)))
             ###########################
             netG.zero_grad()
-            label.fill_(real_label)  # fake labels are real for generator cost
+            label = torch.full_(real_label)  # fake labels are real for generator cost
             output = netD(fake)
             errG = criterion(output, label)
             errG.backward()
@@ -224,6 +235,12 @@ def main(opt):
             optimizerG.step()
 
             global_step += 1
+
+            if global_step % opt.augmentation_interval == 0:
+                kid_score = 1234
+                if False:
+                    augmentation_level += 1
+
 
             if i % opt.log_interval == 0:
                 print(
@@ -241,7 +258,7 @@ def main(opt):
                 )
             if i % opt.save_interval == 0 or i == len(dataloader)-1:
                 vutils.save_image(
-                    real_images, "%s/real_%s.png" % (opt.outi, opt.dataset), normalize=True
+                    real_cpu, "%s/real_%s.png" % (opt.outi, opt.dataset), normalize=True
                 )
                 fake = netG(fixed_noise)
                 vutils.save_image(
@@ -310,6 +327,7 @@ if __name__ == "__main__":
         "--outc", default="./checkpoints/", help="folder to output model checkpoints"
     )
     parser.add_argument("--log-interval", default=25, help="log interval")
+    parser.add_argument("--augmentation-interval", default=10000, help="augmentation interval")
     parser.add_argument("--save-interval", default=100, help="save interval")
     parser.add_argument("--manualSeed", type=int, help="manual seed")
 
