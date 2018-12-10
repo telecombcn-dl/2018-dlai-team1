@@ -266,7 +266,7 @@ def main(opt):
 
     criterion = nn.BCELoss()
 
-    fixed_noise = torch.randn(opt.batch_size, nz, device=device) # TODO should be uniform
+    fixed_noise = torch.rand(opt.batch_size, nz, device=device)*2-1
 
     # setup optimizer
     optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -279,22 +279,6 @@ def main(opt):
 
     for epoch in range(opt.epochs):
 
-        print("Epoch: {}. Computing FID...".format(epoch))
-        samples = random.sample(range(len(dataset)), opt.fid_batch)
-        real_fid = [dataset[s][0] for s in samples]
-        real_fid = torch.stack(real_fid, dim=0)
-        fake_fid = []
-        with torch.no_grad():
-            z = torch.randn(opt.fid_batch, nz, device=device)
-            for k in range(opt.fid_batch // opt.batch_size):
-                z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
-                fake_fid.append(netG(z_))
-            fake_fid = torch.cat(fake_fid, dim=0)
-        #fid = compute_fid(real_fid, fake_fid)
-        #print("FID: {:.4f}".format(fid))
-
-        #writer.add_scalar("fid", fid, global_step)
-
         for i, data in enumerate(dataloader, start=0):
 
             ############################
@@ -305,39 +289,33 @@ def main(opt):
             real = data[0].to(device)
             batch_size = real.size(0)
             if augmentation_level > 0:
+                p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
                 if augmentation_level > 1:
-                    augmentation_bits_old = torch.randint(0, 2, size=(batch_size, augmentation_level-1))
-                    p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
-                    augmentation_bits_new = torch.where(torch.rand(batch_size,1) < p, torch.ones(batch_size,1), torch.zeros(batch_size,1))
-                    print('old: ', augmentation_bits_old.size())
-                    print('new: ', augmentation_bits_new.size())
-                    augmentation_bits = torch.cat((augmentation_bits_old.long(), augmentation_bits_new.long()), dim=1)
+                    augmentation_bits_old = np.random.randint(0, 2, size=(batch_size, augmentation_level-1))
+                    augmentation_bits_new = np.where(np.random.rand(batch_size, 1) < p, np.ones((batch_size,1)), np.zeros((batch_size,1)))
+                    augmentation_bits = np.concatenate((augmentation_bits_old, augmentation_bits_new), dim=1)
                 else:
-                    p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
-                    augmentation_bits = torch.where(torch.rand(batch_size,1) < p, torch.ones(batch_size,1), torch.zeros(batch_size, 1))
+                    augmentation_bits = np.where(np.random.rand(batch_size,1) < p, np.ones((batch_size,1)), np.zeros((batch_size, 1)))
             else:
                 augmentation_bits = None
 
-            real_augmented, labels_augmented = add_channel(
+            real_augmented, real_labels_augmented = add_channel(
                 real, augmentation_bits, real=True
             )
-
-            # label = torch.full((batch_size,), real_label, device=device)
-
             output = netD(real_augmented)
-            errD_real = criterion(output, labels_augmented)
+            errD_real = criterion(output, real_labels_augmented)
             errD_real.backward()
             D_x = output.mean().item()
 
             # train with fake
-            noise = torch.randn(batch_size, nz, device=device)
+            noise = torch.rand(batch_size, nz, device=device)*2-1
             fake = netG(noise)
-            fake_augmented, labels_augmented = add_channel(
+            fake_augmented, fake_labels_augmented = add_channel(
                 fake, augmentation_bits, real=False
             )
-            # label.fill_(fake_label)
+
             output = netD(fake_augmented.detach())
-            errD_fake = criterion(output, labels_augmented)
+            errD_fake = criterion(output, fake_labels_augmented)
             errD_fake.backward()
             D_G_z1 = output.mean().item()
             errD = errD_real + errD_fake
@@ -347,11 +325,8 @@ def main(opt):
             # (2) Update G network: maximize log(D(G(z)))
             ###########################
             netG.zero_grad()
-            label = torch.ones(
-                size=(batch_size,), device=device
-            )  # fake labels are real for generator cost
-            output = netD(fake)
-            errG = criterion(output, label)
+            output = netD(fake_augmented)
+            errG = criterion(output, 1-fake_labels_augmented) # fake labels are real for generator cost
             errG.backward()
             D_G_z2 = output.mean().item()
             optimizerG.step()
@@ -397,30 +372,41 @@ def main(opt):
                 )
 
             if global_step % opt.augmentation_interval == 0:
-                print("Global step: {}. Computing KID...".format(global_step))
-                samples = random.sample(range(len(dataset)), opt.kid_batch)
-                real_kid = [dataset[s][0] for s in samples]
-                real_kid = torch.stack(real_kid, dim=0)
-                fake_kid = []
+                # Compute also FID to have metrics
+                print("Global step: {}. Computing KID and FID...".format(epoch))
+                print("Generating samples")
+                samples = random.sample(range(len(dataset)), opt.fid_batch)
+                real_samples = [dataset[s][0] for s in samples]
+                real_samples = torch.stack(real_samples, dim=0)
+                fake_samples = []
                 with torch.no_grad():
-                    z = torch.randn(opt.kid_batch, nz, device=device)
-                    for k in range(opt.kid_batch // opt.batch_size):
+                    z = torch.rand(opt.fid_batch, nz, device=device)*2-1
+                    for k in range(opt.fid_batch // opt.batch_size):
                         z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
-                        fake_kid.append(netG(z_))
-                    fake_kid = torch.cat(fake_kid, dim=0)
-                kid = compute_kid(real_kid, fake_kid)
+                        fake_samples.append(netG(z_))
+                    fake_samples = torch.cat(fake_samples, dim=0)
+
+                print("Computing FID...")                
+                fid = compute_fid(real_samples, fake_samples)
+                print("FID: {:.4f}".format(fid))
+                writer.add_scalar("fid", fid, global_step)
+
+                print("Computing KID...".format(global_step))
+                kid = compute_kid(real_samples, fake_samples)
                 print("KID: {:.4f}".format(kid))
-                if (
+                if (True or
                     len(kid_score_history) >= 2
-                    and kid <= (kid_score_history[-1] + kid_score_history[-2]) / 40
-                ):  # KID smaller than 5% of the average of the 2 previous ones
+                    and kid >= (kid_score_history[-1] + kid_score_history[-2]) * 19 / 40
+                ):  # (last - KID) smaller than 5% of last
+                    # TODO decrease generator LR (paper is not clear)
                     augmentation_level += 1
                     last_augmentation_step = global_step
                     netD.main.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False))
                     print("Augmentation level increased to {}".format(augmentation_level))
                     kid_score_history = []
-
-                kid_score_history.append(kid)
+                else:
+                    kid_score_history.append(kid)
+                
                 writer.add_scalar("kid", kid, global_step)
                 writer.add_scalar("augmentation_level", augmentation_level, global_step)
         
@@ -499,7 +485,7 @@ if __name__ == "__main__":
         "--fid-batch", default=9984, type=int, help="how many images to use to compute fid"
     )
     parser.add_argument("--save-interval", default=100, type=int, help="save interval")
-    parser.add_argument("--manualSeed", type=int, help="manual seed")
+    parser.add_argument("--manualSeed", default=123, type=int, help="manual seed")
 
     opt = parser.parse_args()
     print(opt)
@@ -517,8 +503,6 @@ if __name__ == "__main__":
     except OSError:
         pass
 
-    if opt.manualSeed is None:
-        opt.manualSeed = random.randint(1, 10000)
     print("Random Seed: ", opt.manualSeed)
     random.seed(opt.manualSeed)
     torch.manual_seed(opt.manualSeed)

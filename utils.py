@@ -18,31 +18,30 @@ def add_channel(images, augmentation_bits, real):
             if real
             else torch.zeros(size=(images.size(0),), device=images.device)
         )
-        return images, labels
     else:
         #XOR
-        print('augmentation bits: ', augmentation_bits)
-        labels = torch.Tensor((np.sum(augmentation_bits.numpy(), axis=1) + real )% 2)
-        print('labels: ', labels)
+        labels = torch.Tensor((np.sum(augmentation_bits, axis=1) + real) % 2).squeeze()
         #Add channels
         augmentation_level = augmentation_bits.shape[1]
         batch_size = augmentation_bits.shape[0]
-        a = np.empty((batch_size, augmentation_level, 64, 64))
+        h, w = images.size()[-2:]
 
+        a = np.empty((batch_size, augmentation_level, h, w))
         for i in range(batch_size):
             for j in range (augmentation_level):
                 a[i, j, :, :] = augmentation_bits[i,j]
 
-        print('image shape:', images.size())
-        print('tensor a shape: ', torch.Tensor(a).size())
-        images = torch.cat((images, torch.Tensor(a)) ,dim=1)
+        images = torch.cat((images, torch.Tensor(a)), dim=1)
 
-        return images, labels
+    return images, labels
 
 
 def compute_kid(real, fake, batch_size=128):
     model.to(real.device)
-    print("Computing Inception Activations")
+    if real.size()[1] == 1:
+        real = torch.cat((real, real, real), dim=1)
+        fake = torch.cat((fake, fake, fake), dim=1)
+    print("Computing Inception Activations")    
     real_activations = get_activations(real, model, batch_size)
     fake_activations = get_activations(fake, model, batch_size)
     print("Computing KID")
@@ -51,6 +50,10 @@ def compute_kid(real, fake, batch_size=128):
 
 def compute_fid(real, fake, batch_size=128):
     model.to(real.device)
+    if real.size()[1] == 1:
+        real = torch.cat((real, real, real), dim=1)
+        fake = torch.cat((fake, fake, fake), dim=1)
+
     real_activations = get_activations(real, model, batch_size)
     real_mu = np.mean(real_activations, axis=0)
     real_sigma = np.cov(real_activations, rowvar=False)
@@ -58,6 +61,7 @@ def compute_fid(real, fake, batch_size=128):
     fake_activations = get_activations(fake, model, batch_size)
     fake_mu = np.mean(fake_activations, axis=0)
     fake_sigma = np.cov(fake_activations, rowvar=False)
+    
     return _fid(real_mu, real_sigma, fake_mu, fake_sigma)
 
 

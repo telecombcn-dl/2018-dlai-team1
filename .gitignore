@@ -3,12 +3,13 @@ data
 samples
 *.zip
 logs
+generated
 test*
 
 web/js/gen_layers.js
 
 # checkpoint
-checkpoint
+checkpoints
 
 # trash
 .dropbox
@@ -85,3 +86,6 @@ target/
 Session.vim
 .netrwhist
 *~
+
+# VS Code
+.vscode
