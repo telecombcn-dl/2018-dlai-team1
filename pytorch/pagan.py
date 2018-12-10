@@ -290,10 +290,10 @@ def main(opt):
                 z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
                 fake_fid.append(netG(z_))
             fake_fid = torch.cat(fake_fid, dim=0)
-        fid = compute_fid(real_fid, fake_fid)
-        print("FID: {:.4f}".format(fid))
+        #fid = compute_fid(real_fid, fake_fid)
+        #print("FID: {:.4f}".format(fid))
 
-        writer.add_scalar("fid", fid, global_step)
+        #writer.add_scalar("fid", fid, global_step)
 
         for i, data in enumerate(dataloader, start=0):
 
@@ -304,22 +304,26 @@ def main(opt):
             netD.zero_grad()
             real = data[0].to(device)
             batch_size = real.size(0)
-
+            augmentation_level = 1
             if augmentation_level > 0:
-                if augmentation level > 1:
+                if augmentation_level > 1:
                     augmentation_bits_old = torch.randint(0, 2, size=(batch_size, augmentation_level-1))
                     p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
-                    augmentation_bits_new = torch.where(torch.rand(batch_size) < p, torch.ones((batch_size,)), torch.zeros((batch_size,)))
-                    augmentation_bits = torch.concat([augmentation_bits_old, augmentation_bits_new], dim=1)
+                    augmentation_bits_new = torch.where(torch.rand(1,batch_size) < p, torch.ones(1, batch_size), torch.zeros(1, batch_size))
+                    print('old: ', augmentation_bits_old.size())
+                    print('new: ', augmentation_bits_new.size())
+                    augmentation_bits = torch.cat((augmentation_bits_old.long(), augmentation_bits_new.long()), dim=1)
                 else:
                     p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
-                    augmentation_bits = torch.where(torch.rand(batch_size) < p, torch.ones((batch_size,)), torch.zeros((batch_size,)))
+                    augmentation_bits = torch.where(torch.rand(1, batch_size) < p, torch.ones(1, batch_size), torch.zeros(1, batch_size))
             else:
                 augmentation_bits = None
 
+            print('augmentation bits: ', augmentation_bits)
             real_augmented, labels_augmented = add_channel(
                 real, augmentation_bits, real=True
             )
+            print('labels augmented: ', labels_augmented)
             # label = torch.full((batch_size,), real_label, device=device)
 
             output = netD(real_augmented)

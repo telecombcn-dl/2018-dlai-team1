@@ -12,7 +12,7 @@ model = InceptionV3()
 model.eval()
 
 def add_channel(images, augmentation_bits, real):
-    if augmentation_bits == None:
+    if augmentation_bits is None:
         labels = (
             torch.ones(size=(images.size(0),), device=images.device)
             if real
@@ -20,7 +20,35 @@ def add_channel(images, augmentation_bits, real):
         )
         return images, labels
     else:
-        raise NotImplementedError
+        #XOR
+        if real:
+            labels = augmentation_bits.clone()
+            labels[augmentation_bits==0] = 1
+            labels[augmentation_bits==1] = 0
+        else:
+            labels = augmentation_bits.clone()
+
+        #Add channels
+        print('augmentation bits size: ', augmentation_bits.size())
+        #print('matrix size', torch.ones(1,28,28).size())
+        matrix = torch.ones(1,28,28)
+        batch_size = augmentation_bits.size()[1]
+        batch_matrix = torch.ones(batch_size,28,28)
+        print('batch_matrix size: ', batch_matrix.size())
+        print('matrix size: ', matrix.size())
+        augmented_matrix = augmentation_bits[:,:,28,28]
+        print('augmented_matrix size: ', augmented_matrix)
+        #new_channels = torch.mul(augmentation_bits, matrix)
+        #new_channels = batch_matrix*augmentation_bits[0,:].expand_as(batch_matrix)
+        #new_channels = matrix * augmentation_bits
+        #new_channels = np.array(augmentation_bits[0,:]) * np.array(matrix[:,28,28])
+        #print('from numpy:', torch.from_numpy(new_channels).size())
+        #new_channels = torch.stack(torch.from_numpy(new_channels))
+
+        print('new channels size: ', new_channels.size())
+
+
+        return images, labels
 
 
 def compute_kid(real, fake, batch_size=128):
