@@ -21,32 +21,21 @@ def add_channel(images, augmentation_bits, real):
         return images, labels
     else:
         #XOR
-        if real:
-            labels = augmentation_bits.clone()
-            labels[augmentation_bits==0] = 1
-            labels[augmentation_bits==1] = 0
-        else:
-            labels = augmentation_bits.clone()
-
+        print('augmentation bits: ', augmentation_bits)
+        labels = torch.Tensor((np.sum(augmentation_bits.numpy(), axis=1) + real )% 2)
+        print('labels: ', labels)
         #Add channels
-        print('augmentation bits size: ', augmentation_bits.size())
-        #print('matrix size', torch.ones(1,28,28).size())
-        matrix = torch.ones(1,28,28)
-        batch_size = augmentation_bits.size()[1]
-        batch_matrix = torch.ones(batch_size,28,28)
-        print('batch_matrix size: ', batch_matrix.size())
-        print('matrix size: ', matrix.size())
-        augmented_matrix = augmentation_bits[:,:,28,28]
-        print('augmented_matrix size: ', augmented_matrix)
-        #new_channels = torch.mul(augmentation_bits, matrix)
-        #new_channels = batch_matrix*augmentation_bits[0,:].expand_as(batch_matrix)
-        #new_channels = matrix * augmentation_bits
-        #new_channels = np.array(augmentation_bits[0,:]) * np.array(matrix[:,28,28])
-        #print('from numpy:', torch.from_numpy(new_channels).size())
-        #new_channels = torch.stack(torch.from_numpy(new_channels))
+        augmentation_level = augmentation_bits.shape[1]
+        batch_size = augmentation_bits.shape[0]
+        a = np.empty((batch_size, augmentation_level, 64, 64))
 
-        print('new channels size: ', new_channels.size())
+        for i in range(batch_size):
+            for j in range (augmentation_level):
+                a[i, j, :, :] = augmentation_bits[i,j]
 
+        print('image shape:', images.size())
+        print('tensor a shape: ', torch.Tensor(a).size())
+        images = torch.cat((images, torch.Tensor(a)) ,dim=1)
 
         return images, labels
 

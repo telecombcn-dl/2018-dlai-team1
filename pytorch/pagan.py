@@ -304,26 +304,24 @@ def main(opt):
             netD.zero_grad()
             real = data[0].to(device)
             batch_size = real.size(0)
-            augmentation_level = 1
             if augmentation_level > 0:
                 if augmentation_level > 1:
                     augmentation_bits_old = torch.randint(0, 2, size=(batch_size, augmentation_level-1))
                     p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
-                    augmentation_bits_new = torch.where(torch.rand(1,batch_size) < p, torch.ones(1, batch_size), torch.zeros(1, batch_size))
+                    augmentation_bits_new = torch.where(torch.rand(batch_size,1) < p, torch.ones(batch_size,1), torch.zeros(batch_size,1))
                     print('old: ', augmentation_bits_old.size())
                     print('new: ', augmentation_bits_new.size())
                     augmentation_bits = torch.cat((augmentation_bits_old.long(), augmentation_bits_new.long()), dim=1)
                 else:
                     p = min(0.5*(global_step-last_augmentation_step)/opt.tr, 0.5)
-                    augmentation_bits = torch.where(torch.rand(1, batch_size) < p, torch.ones(1, batch_size), torch.zeros(1, batch_size))
+                    augmentation_bits = torch.where(torch.rand(batch_size,1) < p, torch.ones(batch_size,1), torch.zeros(batch_size, 1))
             else:
                 augmentation_bits = None
 
-            print('augmentation bits: ', augmentation_bits)
             real_augmented, labels_augmented = add_channel(
                 real, augmentation_bits, real=True
             )
-            print('labels augmented: ', labels_augmented)
+
             # label = torch.full((batch_size,), real_label, device=device)
 
             output = netD(real_augmented)
@@ -418,7 +416,7 @@ def main(opt):
                 ):  # KID smaller than 5% of the average of the 2 previous ones
                     augmentation_level += 1
                     last_augmentation_step = global_step
-                    netD.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False))
+                    netD.main.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False))
                     print("Augmentation level increased to {}".format(augmentation_level))
                     kid_score_history = []
 
