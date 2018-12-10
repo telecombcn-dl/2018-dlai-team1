@@ -265,7 +265,7 @@ def main(opt):
 
     criterion = nn.BCELoss()
 
-    fixed_noise = torch.randn(opt.batch_size, nz, device=device)
+    fixed_noise = torch.rand(opt.batch_size, nz, device=device)*2-1
     real_label = 1
     fake_label = 0
 
@@ -276,22 +276,6 @@ def main(opt):
     global_step = 0
 
     for epoch in range(opt.epochs):
-
-        print("Epoch: {}. Computing FID...".format(epoch))
-        samples = random.sample(range(len(dataset)), opt.fid_batch)
-        real_fid = [dataset[s][0] for s in samples]
-        real_fid = torch.stack(real_fid, dim=0).to(device)
-        fake_fid = []
-        with torch.no_grad():
-            z = torch.randn(opt.fid_batch, nz, device=device)
-            for k in tqdm(range(opt.fid_batch // opt.batch_size), desc="Generating fake images"):
-                z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
-                fake_fid.append(netG(z_))
-            fake_fid = torch.cat(fake_fid, dim=0).to(device)
-        fid = compute_fid(real_fid, fake_fid)
-        print("FID: {:.4f}".format(fid))
-
-        writer.add_scalar("fid", fid, global_step)
 
         for i, data in enumerate(dataloader, start=0):
             ############################
@@ -309,7 +293,7 @@ def main(opt):
             D_x = output.mean().item()
 
             # train with fake
-            noise = torch.randn(batch_size, nz, device=device)
+            noise = torch.rand(batch_size, nz, device=device)*2-1
             fake = netG(noise)
             label.fill_(fake_label)
             output = netD(fake.detach())
@@ -369,6 +353,22 @@ def main(opt):
                     "%s/fake_%s_epoch_%03d.png" % (opt.outi, opt.dataset, epoch),
                     normalize=True,
                 )
+            if global_step % opt.fid_interval == 0
+                print("Epoch: {}. Computing FID...".format(epoch))
+                samples = random.sample(range(len(dataset)), opt.fid_batch)
+                real_fid = [dataset[s][0] for s in samples]
+                real_fid = torch.stack(real_fid, dim=0).to(device)
+                fake_fid = []
+                with torch.no_grad():
+                    z = torch.rand(opt.fid_batch, nz, device=device)*2-1
+                    for k in tqdm(range(opt.fid_batch // opt.batch_size), desc="Generating fake images"):
+                        z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
+                        fake_fid.append(netG(z_))
+                    fake_fid = torch.cat(fake_fid, dim=0).to(device)
+                fid = compute_fid(real_fid, fake_fid)
+                print("FID: {:.4f}".format(fid))
+
+                writer.add_scalar("fid", fid, global_step)
             
             global_step += 1
 
@@ -435,6 +435,7 @@ if __name__ == "__main__":
         "--fid-batch", default=9984, type=int, help="how many images to use to compute fid"
     )
     parser.add_argument("--log-interval", default=25, type=int, help="log interval")
+    parser.add_argument("--fid-interval", default=10000, type=int, help="fid interval")
     parser.add_argument("--save-interval", default=100, type=int, help="save interval")
     parser.add_argument("--manualSeed", type=int, help="manual seed")
 
