@@ -353,7 +353,7 @@ def main(opt):
                     "%s/fake_%s_epoch_%03d.png" % (opt.outi, opt.dataset, epoch),
                     normalize=True,
                 )
-            if global_step % opt.fid_interval == 0
+            if global_step % opt.fid_interval == 0:
                 print("Epoch: {}. Computing FID...".format(epoch))
                 samples = random.sample(range(len(dataset)), opt.fid_batch)
                 real_fid = [dataset[s][0] for s in samples]
