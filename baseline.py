@@ -413,7 +413,7 @@ if __name__ == "__main__":
         "--ndf", type=int, default=64, help="number of discriminator filters"
     )
     parser.add_argument(
-        "--epochs", type=int, default=25, help="number of epochs to train for"
+        "--epochs", type=int, default=200, help="number of epochs to train for"
     )
     parser.add_argument(
         "--lr", type=float, default=0.0002, help="learning rate, default=0.0002"
