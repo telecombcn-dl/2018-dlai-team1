@@ -373,7 +373,7 @@ def main(opt):
 
             if global_step % opt.augmentation_interval == 0:
                 # Compute also FID to have metrics
-                print("Global step: {}. Computing KID and FID...".format(epoch))
+                print("Global step: {}. Computing KID and FID...".format(global_step))
                 print("Generating samples")
                 samples = random.sample(range(len(dataset)), opt.fid_batch)
                 real_samples = [dataset[s][0] for s in samples]
@@ -391,7 +391,7 @@ def main(opt):
                 print("FID: {:.4f}".format(fid))
                 writer.add_scalar("fid", fid, global_step)
 
-                print("Computing KID...".format(global_step))
+                print("Computing KID...")
                 kid = compute_kid(real_samples, fake_samples)
                 print("KID: {:.4f}".format(kid))
                 if (True or

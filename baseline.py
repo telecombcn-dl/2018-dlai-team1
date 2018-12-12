@@ -16,7 +16,7 @@ from tensorboardX import SummaryWriter
 from collections import OrderedDict
 import torch.nn.functional as F
 
-from utils import compute_fid
+from utils import compute_fid, compute_kid
 from tqdm import tqdm
 
 # class Generator(nn.Module):
@@ -354,7 +354,7 @@ def main(opt):
                     normalize=True,
                 )
             if global_step % opt.fid_interval == 0
-                print("Epoch: {}. Computing FID...".format(epoch))
+                print("Global step: {}. Computing FID...".format(global_step))
                 samples = random.sample(range(len(dataset)), opt.fid_batch)
                 real_fid = [dataset[s][0] for s in samples]
                 real_fid = torch.stack(real_fid, dim=0).to(device)
@@ -365,11 +365,15 @@ def main(opt):
                         z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
                         fake_fid.append(netG(z_))
                     fake_fid = torch.cat(fake_fid, dim=0).to(device)
-                fid = compute_fid(real_fid, fake_fid)
+                print("Computing FID...")                
+                fid = compute_fid(real_samples, fake_samples)
                 print("FID: {:.4f}".format(fid))
-
                 writer.add_scalar("fid", fid, global_step)
-            
+
+                print("Computing KID...")
+                kid = compute_kid(real_samples, fake_samples)
+                print("KID: {:.4f}".format(kid))
+                writer.add_scalar("kid", kid, global_step)
             global_step += 1
 
         # do checkpointing
@@ -437,7 +441,8 @@ if __name__ == "__main__":
     parser.add_argument("--log-interval", default=25, type=int, help="log interval")
     parser.add_argument("--fid-interval", default=10000, type=int, help="fid interval")
     parser.add_argument("--save-interval", default=100, type=int, help="save interval")
-    parser.add_argument("--manualSeed", type=int, help="manual seed")
+    parser.add_argument("--manualSeed", default=123, type=int, help="manual seed")
+    parser.add_argument("--logdir", default="logs", type=str, help="log dir")
 
     opt = parser.parse_args()
     print(opt)
