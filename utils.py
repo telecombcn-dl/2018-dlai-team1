@@ -65,6 +65,25 @@ def compute_fid(real, fake, batch_size=128):
     return _fid(real_mu, real_sigma, fake_mu, fake_sigma)
 
 
+def compute_metrics(real, fake, batch_size=128):
+    model.to(real.device)
+    if real.size()[1] == 1:
+        real = torch.cat((real, real, real), dim=1)
+        fake = torch.cat((fake, fake, fake), dim=1)
+    real_activations = get_activations(real, model, batch_size)
+    fake_activations = get_activations(fake, model, batch_size)
+
+    kid = _kid(real_activations, fake_activations)
+
+    real_mu = np.mean(real_activations, axis=0)
+    real_sigma = np.cov(real_activations, rowvar=False)
+    fake_mu = np.mean(fake_activations, axis=0)
+    fake_sigma = np.cov(fake_activations, rowvar=False)
+    fid = _fid(real_mu, real_sigma, fake_mu, fake_sigma)
+
+    return kid, fid
+
+
 def get_activations(images, model, batch_size=128, dims=2048):
     """Calculates the activations of the pool_3 layer for all images.
     Params:

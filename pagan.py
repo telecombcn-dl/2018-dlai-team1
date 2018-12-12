@@ -15,7 +15,7 @@ import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from tensorboardX import SummaryWriter
 from torch.nn.utils import spectral_norm
-from utils import add_channel, compute_kid
+from utils import add_channel, compute_metrics
 import torch.nn.functional as F
 
 from utils import compute_fid
@@ -372,30 +372,24 @@ def main(opt):
                 )
 
             if global_step % opt.augmentation_interval == 0:
-                # Compute also FID to have metrics
-                print("Global step: {}. Computing KID and FID...".format(global_step))
-                print("Generating samples")
+                print("Global step: {}. Computing FID...".format(global_step))
                 samples = random.sample(range(len(dataset)), opt.fid_batch)
                 real_samples = [dataset[s][0] for s in samples]
-                real_samples = torch.stack(real_samples, dim=0)
+                real_samples = torch.stack(real_samples, dim=0).to(device)
                 fake_samples = []
                 with torch.no_grad():
                     z = torch.rand(opt.fid_batch, nz, device=device)*2-1
-                    for k in range(opt.fid_batch // opt.batch_size):
+                    for k in tqdm(range(opt.fid_batch // opt.batch_size), desc="Generating fake images"):
                         z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
                         fake_samples.append(netG(z_))
-                    fake_samples = torch.cat(fake_samples, dim=0)
-
-                print("Computing FID...")                
-                fid = compute_fid(real_samples, fake_samples)
+                    fake_samples = torch.cat(fake_samples, dim=0).to(device)
+                print("Computing KID and FID...")                
+                kid, fid = compute_metrics(real_samples, fake_samples)
                 print("FID: {:.4f}".format(fid))
                 writer.add_scalar("fid", fid, global_step)
-
-                print("Computing KID...")
-                kid = compute_kid(real_samples, fake_samples)
                 print("KID: {:.4f}".format(kid))
-                if (True or
-                    len(kid_score_history) >= 2
+                writer.add_scalar("kid", kid, global_step)
+                if (len(kid_score_history) >= 2
                     and kid >= (kid_score_history[-1] + kid_score_history[-2]) * 19 / 40
                 ):  # (last - KID) smaller than 5% of last
                     # TODO decrease generator LR (paper is not clear)

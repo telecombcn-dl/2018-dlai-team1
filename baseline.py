@@ -16,7 +16,7 @@ from tensorboardX import SummaryWriter
 from collections import OrderedDict
 import torch.nn.functional as F
 
-from utils import compute_fid, compute_kid
+from utils import compute_metrics
 from tqdm import tqdm
 
 # class Generator(nn.Module):
@@ -356,22 +356,19 @@ def main(opt):
             if global_step % opt.fid_interval == 0:
                 print("Global step: {}. Computing FID...".format(global_step))
                 samples = random.sample(range(len(dataset)), opt.fid_batch)
-                real_fid = [dataset[s][0] for s in samples]
-                real_fid = torch.stack(real_fid, dim=0).to(device)
-                fake_fid = []
+                real_samples = [dataset[s][0] for s in samples]
+                real_samples = torch.stack(real_samples, dim=0).to(device)
+                fake_samples = []
                 with torch.no_grad():
                     z = torch.rand(opt.fid_batch, nz, device=device)*2-1
                     for k in tqdm(range(opt.fid_batch // opt.batch_size), desc="Generating fake images"):
                         z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
-                        fake_fid.append(netG(z_))
-                    fake_fid = torch.cat(fake_fid, dim=0).to(device)
-                print("Computing FID...")                
-                fid = compute_fid(real_samples, fake_samples)
+                        fake_samples.append(netG(z_))
+                    fake_samples = torch.cat(fake_samples, dim=0).to(device)
+                print("Computing KID and FID...")                
+                kid, fid = compute_metrics(real_samples, fake_samples)
                 print("FID: {:.4f}".format(fid))
                 writer.add_scalar("fid", fid, global_step)
-
-                print("Computing KID...")
-                kid = compute_kid(real_samples, fake_samples)
                 print("KID: {:.4f}".format(kid))
                 writer.add_scalar("kid", kid, global_step)
             global_step += 1
