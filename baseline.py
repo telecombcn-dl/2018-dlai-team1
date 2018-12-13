@@ -234,6 +234,18 @@ def main(opt):
                 ]
             ),
         )
+    elif opt.dataset == "fashionmnist":
+        dataset = dset.FashionMNIST(
+            root=opt.dataroot,
+            download=True,
+            transform=transforms.Compose(
+                [
+                    transforms.Resize(opt.imageSize),
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.5,), (0.5,)),
+                ]
+            ),
+        )
     elif opt.dataset == "fake":
         dataset = dset.FakeData(
             image_size=(3, opt.imageSize, opt.imageSize),
@@ -249,7 +261,7 @@ def main(opt):
     nz = int(opt.nz)
     ngf = int(opt.ngf)
     ndf = int(opt.ndf)
-    nc = 1 if opt.dataset == "mnist" else 3
+    nc = 1 if opt.dataset in {"mnist", "fashionmnist"} else 3
 
     netG = Generator(ngpu, nc, nz, ngf).to(device)
     netG.apply(weights_init)
