@@ -282,6 +282,38 @@ def main(opt):
 
         for i, data in enumerate(dataloader, start=0):
 
+            if global_step % opt.augmentation_interval == 0:
+                print("Global step: {}. Computing metrics...".format(global_step))
+                samples = random.sample(range(len(dataset)), opt.fid_batch)
+                real_samples = [dataset[s][0] for s in samples]
+                real_samples = torch.stack(real_samples, dim=0).to(device)
+                fake_samples = []
+                with torch.no_grad():
+                    z = torch.rand(opt.fid_batch, nz, device=device)*2-1
+                    for k in tqdm(range(opt.fid_batch // opt.batch_size), desc="Generating fake images"):
+                        z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
+                        fake_samples.append(netG(z_))
+                    fake_samples = torch.cat(fake_samples, dim=0).to(device)
+                print("Computing KID and FID...")                
+                kid, fid = compute_metrics(real_samples, fake_samples)
+                print("FID: {:.4f}".format(fid))
+                writer.add_scalar("fid", fid, global_step)
+                print("KID: {:.4f}".format(kid))
+                writer.add_scalar("kid", kid, global_step)
+                if (len(kid_score_history) >= 2
+                    and kid >= (kid_score_history[-1] + kid_score_history[-2]) * 19 / 40
+                ):  # (last - KID) smaller than 5% of last
+                    # TODO decrease generator LR (paper is not clear)
+                    augmentation_level += 1
+                    last_augmentation_step = global_step
+                    netD.main.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False))
+                    print("Augmentation level increased to {}".format(augmentation_level))
+                    kid_score_history = []
+                else:
+                    kid_score_history.append(kid)
+                
+                writer.add_scalar("augmentation_level", augmentation_level, global_step)
+
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
             ###########################
@@ -371,39 +403,6 @@ def main(opt):
                     "%s/fake_%s_epoch_%03d.png" % (opt.outi, opt.dataset, epoch),
                     normalize=True,
                 )
-
-            if global_step % opt.augmentation_interval == 0:
-                print("Global step: {}. Computing FID...".format(global_step))
-                samples = random.sample(range(len(dataset)), opt.fid_batch)
-                real_samples = [dataset[s][0] for s in samples]
-                real_samples = torch.stack(real_samples, dim=0).to(device)
-                fake_samples = []
-                with torch.no_grad():
-                    z = torch.rand(opt.fid_batch, nz, device=device)*2-1
-                    for k in tqdm(range(opt.fid_batch // opt.batch_size), desc="Generating fake images"):
-                        z_ = z[k * opt.batch_size : (k + 1) * opt.batch_size]
-                        fake_samples.append(netG(z_))
-                    fake_samples = torch.cat(fake_samples, dim=0).to(device)
-                print("Computing KID and FID...")                
-                kid, fid = compute_metrics(real_samples, fake_samples)
-                print("FID: {:.4f}".format(fid))
-                writer.add_scalar("fid", fid, global_step)
-                print("KID: {:.4f}".format(kid))
-                writer.add_scalar("kid", kid, global_step)
-                if (len(kid_score_history) >= 2
-                    and kid >= (kid_score_history[-1] + kid_score_history[-2]) * 19 / 40
-                ):  # (last - KID) smaller than 5% of last
-                    # TODO decrease generator LR (paper is not clear)
-                    augmentation_level += 1
-                    last_augmentation_step = global_step
-                    netD.main.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False))
-                    print("Augmentation level increased to {}".format(augmentation_level))
-                    kid_score_history = []
-                else:
-                    kid_score_history.append(kid)
-                
-                writer.add_scalar("kid", kid, global_step)
-                writer.add_scalar("augmentation_level", augmentation_level, global_step)
         
             global_step += 1
 
