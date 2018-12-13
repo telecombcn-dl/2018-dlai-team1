@@ -1,13 +1,16 @@
 from __future__ import print_function
-from collections import OrderedDict
+
 import argparse
 import os
 import random
+from collections import OrderedDict
+
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.parallel
 import torch.backends.cudnn as cudnn
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 import torchvision.datasets as dset
@@ -15,11 +18,9 @@ import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from tensorboardX import SummaryWriter
 from torch.nn.utils import spectral_norm
-from utils import add_channel, compute_metrics
-import torch.nn.functional as F
+from tqdm import tqdm
 
-from utils import compute_fid
-
+from utils import add_channel, compute_fid, compute_metrics
 
 # class Generator(nn.Module):
 #     def __init__(self, ngpu, nc, nz, ngf):
