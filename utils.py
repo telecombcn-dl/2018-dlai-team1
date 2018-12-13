@@ -30,8 +30,9 @@ def add_channel(images, augmentation_bits, real):
         for i in range(batch_size):
             for j in range (augmentation_level):
                 a[i, j, :, :] = augmentation_bits[i,j]
-
-        images = torch.cat((images, torch.Tensor(a)), dim=1)
+        a = torch.Tensor(a)
+        a = a.to(images.device)
+        images = torch.cat((images, a), dim=1)
 
     return images, labels
 
