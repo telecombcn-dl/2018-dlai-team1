@@ -318,7 +318,7 @@ def main(opt):
                     # TODO decrease generator LR (paper is not clear)
                     augmentation_level += 1
                     last_augmentation_step = global_step
-                    netD.main.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False)).to(netD.main.conv1.device)
+                    netD.main.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False)).to(device)
                     print("Augmentation level increased to {}".format(augmentation_level))
                     kid_score_history = []
                 else:
