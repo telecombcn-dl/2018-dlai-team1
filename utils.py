@@ -20,7 +20,7 @@ def add_channel(images, augmentation_bits, real):
         )
     else:
         #XOR
-        labels = torch.Tensor((np.sum(augmentation_bits, axis=1) + real) % 2).squeeze()
+        labels = torch.Tensor((np.sum(augmentation_bits, axis=1) + real) % 2).squeeze().to(images.device)
         #Add channels
         augmentation_level = augmentation_bits.shape[1]
         batch_size = augmentation_bits.shape[0]
