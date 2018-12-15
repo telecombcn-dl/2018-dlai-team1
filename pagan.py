@@ -338,7 +338,7 @@ def main(opt):
                 if augmentation_level > 1:
                     augmentation_bits_old = np.random.randint(0, 2, size=(batch_size, augmentation_level-1))
                     augmentation_bits_new = np.where(np.random.rand(batch_size, 1) < p, np.ones((batch_size,1)), np.zeros((batch_size,1)))
-                    augmentation_bits = np.concatenate((augmentation_bits_old, augmentation_bits_new), dim=1)
+                    augmentation_bits = np.concatenate((augmentation_bits_old, augmentation_bits_new), axis=1)
                 else:
                     augmentation_bits = np.where(np.random.rand(batch_size,1) < p, np.ones((batch_size,1)), np.zeros((batch_size, 1)))
             else:
