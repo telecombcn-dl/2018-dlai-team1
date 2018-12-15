@@ -390,12 +390,21 @@ def main(opt):
         # do checkpointing
         torch.save(
             netG.state_dict(),
-            "%s/netG_%s_epoch_%d.pth" % (opt.outc, opt.dataset, epoch),
+            "%s/netG_%s_last.pth" % (opt.outc, opt.dataset),
         )
         torch.save(
             netD.state_dict(),
-            "%s/netD_%s_epoch_%d.pth" % (opt.outc, opt.dataset, epoch),
+            "%s/netD_%s_last.pth" % (opt.outc, opt.dataset),
         )
+        if epoch%20 == 0:
+            torch.save(
+                netG.state_dict(),
+                "%s/netG_%s_epoch_%d.pth" % (opt.outc, opt.dataset, epoch),
+            )
+            torch.save(
+                netD.state_dict(),
+                "%s/netD_%s_epoch_%d.pth" % (opt.outc, opt.dataset, epoch),
+            )
 
 
 if __name__ == "__main__":
