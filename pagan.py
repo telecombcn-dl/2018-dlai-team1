@@ -184,7 +184,7 @@ def weights_init(m):
 
 
 def main(opt):
-    writer = SummaryWriter(log_dir="logs/pagan/{}".format(opt.dataset))
+    writer = SummaryWriter(log_dir="logs/baseline/{}/lr={}_beta1={}_al={}_randomSeed={}/".format(opt.dataset, opt.beta1, opt.lr, opt.al, opt.manualSeed))
 
     if opt.dataset in ["imagenet", "folder", "lfw"]:
         # folder dataset
@@ -272,6 +272,8 @@ def main(opt):
     print(netG)
 
     netD = Discriminator(ngpu, nc, ndf).to(device)
+    augmentation_level = opt.al
+    netD.main.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False)).to(device)
     netD.apply(weights_init)
     if opt.netD != "":
         netD.load_state_dict(torch.load(opt.netD))
@@ -282,11 +284,10 @@ def main(opt):
     fixed_noise = torch.rand(opt.batch_size, nz, device=device)*2-1
 
     # setup optimizer
-    optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-    optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+    optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, opt.beta2))
+    optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, opt.beta2))
 
     global_step = 0
-    augmentation_level = 0
     last_augmentation_step = 0
     kid_score_history = []
 
@@ -309,9 +310,9 @@ def main(opt):
                 print("Computing KID and FID...")                
                 kid, fid = compute_metrics(real_samples, fake_samples)
                 print("FID: {:.4f}".format(fid))
-                writer.add_scalar("fid", fid, global_step)
+                writer.add_scalar("metrics/fid", fid, global_step)
                 print("KID: {:.4f}".format(kid))
-                writer.add_scalar("kid", kid, global_step)
+                writer.add_scalar("metrics/kid", kid, global_step)
                 if (len(kid_score_history) >= 2
                     and kid >= (kid_score_history[-1] + kid_score_history[-2]) * 19 / 40
                 ):  # (last - KID) smaller than 5% of last
@@ -319,6 +320,8 @@ def main(opt):
                     augmentation_level += 1
                     last_augmentation_step = global_step
                     netD.main.conv1 = spectral_norm(nn.Conv2d(nc+augmentation_level, ndf, 3, 1, 1, bias=False)).to(device)
+                    netD.main.conv1.apply(weights_init)
+                    optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, opt.beta2))
                     print("Augmentation level increased to {}".format(augmentation_level))
                     kid_score_history = []
                 else:
@@ -472,7 +475,13 @@ if __name__ == "__main__":
         "--beta1", type=float, default=0.5, help="beta1 for adam. default=0.5"
     )
     parser.add_argument(
+        "--beta2", type=float, default=0.999, help="beta2 for adam. default=0.999"
+    )
+    parser.add_argument(
         "--tr", type=int, default=5000, help="steps for p to reach 0.5"
+    )
+    parser.add_argument(
+        "--al", type=int, default=0, help="starting augmentation level"
     )
     parser.add_argument("--cuda", action="store_true", help="enables cuda")
     parser.add_argument("--ngpu", type=int, default=1, help="number of GPUs to use")
@@ -499,7 +508,7 @@ if __name__ == "__main__":
         "--fid-batch", default=9984, type=int, help="how many images to use to compute fid"
     )
     parser.add_argument("--save-interval", default=100, type=int, help="save interval")
-    parser.add_argument("--manualSeed", default=123, type=int, help="manual seed")
+    parser.add_argument("--manualSeed", default=None, type=int, help="manual seed")
 
     opt = parser.parse_args()
     print(opt)
@@ -517,6 +526,8 @@ if __name__ == "__main__":
     except OSError:
         pass
 
+    if opt.manualSeed is None:
+        opt.manualSeed = random.randint(1, 10000)
     print("Random Seed: ", opt.manualSeed)
     random.seed(opt.manualSeed)
     torch.manual_seed(opt.manualSeed)

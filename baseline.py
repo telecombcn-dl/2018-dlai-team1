@@ -182,7 +182,7 @@ def weights_init(m):
 
 
 def main(opt):
-    writer = SummaryWriter(log_dir="logs/baseline/{}".format(opt.dataset))
+    writer = SummaryWriter(log_dir="logs/baseline/{}/lr={}_beta1={}_randomSeed={}/".format(opt.dataset, opt.beta1, opt.lr, opt.manualSeed))
 
     if opt.dataset in ["imagenet", "folder", "lfw"]:
         # folder dataset
@@ -282,8 +282,8 @@ def main(opt):
     fake_label = 0
 
     # setup optimizer
-    optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-    optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+    optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, opt.beta2))
+    optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, opt.beta2))
 
     global_step = 0
 
@@ -306,9 +306,9 @@ def main(opt):
                 print("Computing KID and FID...")                
                 kid, fid = compute_metrics(real_samples, fake_samples)
                 print("FID: {:.4f}".format(fid))
-                writer.add_scalar("fid", fid, global_step)
+                writer.add_scalar("metrics/fid", fid, global_step)
                 print("KID: {:.4f}".format(kid))
-                writer.add_scalar("kid", kid, global_step)
+                writer.add_scalar("metrics/kid", kid, global_step)
 
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -441,6 +441,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--beta1", type=float, default=0.5, help="beta1 for adam. default=0.5"
     )
+    parser.add_argument(
+        "--beta2", type=float, default=0.999, help="beta2 for adam. default=0.999"
+    )
     parser.add_argument("--cuda", action="store_true", help="enables cuda")
     parser.add_argument("--ngpu", type=int, default=1, help="number of GPUs to use")
     parser.add_argument(
@@ -461,7 +464,7 @@ if __name__ == "__main__":
     parser.add_argument("--log-interval", default=25, type=int, help="log interval")
     parser.add_argument("--fid-interval", default=10000, type=int, help="fid interval")
     parser.add_argument("--save-interval", default=100, type=int, help="save interval")
-    parser.add_argument("--manualSeed", default=123, type=int, help="manual seed")
+    parser.add_argument("--manualSeed", default=None, type=int, help="manual seed")
     parser.add_argument("--logdir", default="logs", type=str, help="log dir")
 
     opt = parser.parse_args()
