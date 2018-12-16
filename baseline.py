@@ -19,6 +19,8 @@ import torch.nn.functional as F
 from utils import compute_metrics
 from tqdm import tqdm
 
+from download import download_celeb_a
+
 # class Generator(nn.Module):
 #     def __init__(self, ngpu, nc, nz, ngf):
 #         super(Generator, self).__init__()
@@ -243,6 +245,19 @@ def main(opt):
                     transforms.Resize(opt.imageSize),
                     transforms.ToTensor(),
                     transforms.Normalize((0.5,), (0.5,)),
+                ]
+            ),
+        )
+    elif opt.dataset == "celebA":
+        download_celeb_a("data")
+        dataset = dset.ImageFolder(
+            root="data/celebA",
+            transform=transforms.Compose(
+                [
+                    transforms.Resize(opt.imageSize),
+                    transforms.CenterCrop(opt.imageSize),
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                 ]
             ),
         )
