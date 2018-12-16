@@ -186,7 +186,7 @@ def weights_init(m):
 
 
 def main(opt):
-    writer = SummaryWriter(log_dir="logs/baseline/{}/lr={}_beta1={}_al={}_randomSeed={}/".format(opt.dataset, opt.beta1, opt.lr, opt.al, opt.manualSeed))
+    writer = SummaryWriter(log_dir="logs/pagan/{}/lr={}_beta1={}_al={}_randomSeed={}/".format(opt.dataset, opt.beta1, opt.lr, opt.al, opt.manualSeed))
 
     if opt.dataset in ["imagenet", "folder", "lfw"]:
         # folder dataset
