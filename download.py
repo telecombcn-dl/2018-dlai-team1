@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 def download_celeb_a(dirpath):
     if not os.path.isdir(dirpath):
-        os.path.makedirs(dirpath)
+        os.makedirs(dirpath)
     data_dir = 'celebA'
     if os.path.exists(os.path.join(dirpath, data_dir)):
         print('Found Celeb-A - skip')
