@@ -390,7 +390,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--beta2", type=float, default=0.999, help="beta2 for adam. default=0.999"
     )
-    parser.add_argument("--cuda", action="store_true", help="enables cuda")
+    parser.add_argument("--cpu", action="store_true", help="use cpu")
     parser.add_argument("--ngpu", type=int, default=1, help="number of GPUs to use")
     parser.add_argument(
         "--netG", default="", help="path to netG (to continue training)"
@@ -437,7 +437,9 @@ if __name__ == "__main__":
 
     cudnn.benchmark = True
 
-    if torch.cuda.is_available() and not opt.cuda:
-        print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+    if not torch.cuda.is_available() or opt.cpu:
+        opt.cuda = False
+    else:
+        opt.cuda = True
 
     main(opt)
